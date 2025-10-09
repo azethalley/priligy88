@@ -5,7 +5,9 @@ nixPkgs = ["nodejs", "pnpm"]
 cmds = ["pnpm install --frozen-lockfile"]
 
 [phases.build]
-cmds = ["pnpm run build --filter=payload_app"]
+cmds = [
+  "if [ \"$SERVICE_TYPE\" = \"website\" ]; then pnpm run build --filter=website; else pnpm run build --filter=payload_app; fi"
+]
 
 [start]
-cmd = "cd apps/payload_app && pnpm start"
+cmd = "if [ \"$SERVICE_TYPE\" = \"website\" ]; then cd apps/website && pnpm start; else cd apps/payload_app && pnpm start; fi"
