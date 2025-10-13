@@ -62,7 +62,7 @@ export default defineConfig({
     mode: "standalone",
   }),
   server: {
-    port: 4321,
+    port: process.env.PORT || 4321,
     host: true,
   },
   devToolbar: { enabled: false },
