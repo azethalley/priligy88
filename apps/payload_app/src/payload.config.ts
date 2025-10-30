@@ -1,5 +1,6 @@
 // storage-adapter-import-placeholder
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { payloadCloudPlugin } from '@payloadcms/payload-cloud'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
@@ -27,6 +28,23 @@ import 'dotenv/config'
 console.log(process.env.DATABASE_URI)
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+
+// Determine which database adapter to use based on environment variable
+const useMongoDB = process.env.USE_MONGODB === 'true'
+const databaseAdapter = useMongoDB 
+  ? mongooseAdapter({
+      url: process.env.DATABASE_URI || '',
+    })
+  : postgresAdapter({
+      pool: {
+        connectionString: process.env.DATABASE_URI || '',
+        max: 20, // Maximum number of connections in pool
+        min: 2, // Minimum number of connections in pool
+        idleTimeoutMillis: 10000, // Close connections after 10 seconds of inactivity
+        connectionTimeoutMillis: 30000, // Maximum time to get connection before throwing error
+      },
+    })
+
 export default buildConfig({
   admin: {
     user: Users.slug,
@@ -54,15 +72,7 @@ export default buildConfig({
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
-  db: postgresAdapter({
-    pool: {
-      connectionString: process.env.DATABASE_URI || '',
-      max: 20, // Maximum number of connections in pool
-      min: 2, // Minimum number of connections in pool
-      idleTimeoutMillis: 10000, // Close connections after 10 seconds of inactivity
-      connectionTimeoutMillis: 30000, // Maximum time to get connection before throwing error
-    },
-  }),
+  db: databaseAdapter,
   sharp: sharp as SharpDependency,
   plugins: [
     payloadCloudPlugin(),

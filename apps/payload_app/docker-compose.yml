@@ -16,7 +16,9 @@ services:
     env_file:
       - .env
 
-  # Ensure your DATABASE_URI uses 'mongo' as the hostname ie. mongodb://mongo/my-db-name
+  # MongoDB Service
+  # Ensure your .env file has USE_MONGODB=true and DATABASE_URI uses 'mongo' as the hostname
+  # Example: DATABASE_URI=mongodb://mongo:27017/your-database-name
   mongo:
     image: mongo:latest
     ports:
@@ -28,7 +30,11 @@ services:
     logging:
       driver: none
 
-  # Uncomment the following to use postgres
+  # PostgreSQL Service (alternative to MongoDB)
+  # To use PostgreSQL instead: 
+  # 1. Set USE_MONGODB=false (or remove it) in your .env file
+  # 2. Update .env DATABASE_URI to: postgresql://postgres:password@postgres:5432/payload-db
+  # 3. Uncomment postgres service below and change depends_on to use postgres instead of mongo
   # postgres:
   #   restart: always
   #   image: postgres:latest

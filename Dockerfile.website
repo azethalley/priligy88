@@ -1,0 +1,61 @@
+# Dockerfile for Website App (Astro SSR)
+# To use this Dockerfile in Dokploy, set the Dockerfile path to: Dockerfile.website
+
+FROM node:20-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Enable pnpm
+RUN corepack enable pnpm
+
+# Copy root package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Copy app package.json
+COPY apps/website/package.json ./apps/website/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+
+# Enable pnpm
+RUN corepack enable pnpm
+
+# Copy dependencies
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/website/node_modules ./apps/website/node_modules
+
+# Copy all source files
+COPY . .
+
+# Build the application
+RUN pnpm run build --filter=website
+
+# Production image - using Node.js runtime for Astro SSR
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=4321
+ENV HOSTNAME="0.0.0.0"
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nodeuser
+
+# Copy built application
+COPY --from=builder --chown=nodeuser:nodejs /app/apps/website/dist ./apps/website/dist
+COPY --from=builder --chown=nodeuser:nodejs /app/apps/website/node_modules ./apps/website/node_modules
+
+USER nodeuser
+
+EXPOSE 4321
+
+# Start the Astro server
+WORKDIR /app/apps/website
+CMD ["node", "dist/server/entry.mjs"]
+

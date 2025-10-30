@@ -104,7 +104,7 @@ export interface Config {
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
   };
   db: {
-    defaultIDType: number;
+    defaultIDType: string;
   };
   globals: {};
   globalsSelect: {};
@@ -140,7 +140,7 @@ export interface UserAuthOperations {
  * via the `definition` "users".
  */
 export interface User {
-  id: number;
+  id: string;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -164,8 +164,9 @@ export interface User {
  * via the `definition` "media".
  */
 export interface Media {
-  id: number;
+  id: string;
   alt: string;
+  _key?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -183,10 +184,10 @@ export interface Media {
  * via the `definition` "product-categories".
  */
 export interface ProductCategory {
-  id: number;
+  id: string;
   name: string;
   slug?: string | null;
-  featuredImage: number | Media;
+  featuredImage: string | Media;
   updatedAt: string;
   createdAt: string;
 }
@@ -195,7 +196,7 @@ export interface ProductCategory {
  * via the `definition` "product-tags".
  */
 export interface ProductTag {
-  id: number;
+  id: string;
   name: string;
   slug?: string | null;
   updatedAt: string;
@@ -206,7 +207,7 @@ export interface ProductTag {
  * via the `definition` "brands".
  */
 export interface Brand {
-  id: number;
+  id: string;
   name: string;
   slug?: string | null;
   updatedAt: string;
@@ -217,9 +218,9 @@ export interface Brand {
  * via the `definition` "products".
  */
 export interface Product {
-  id: number;
+  id: string;
   title: string;
-  featuredImage: number | Media;
+  featuredImage: string | Media;
   slug?: string | null;
   description?: {
     root: {
@@ -238,10 +239,10 @@ export interface Product {
   } | null;
   discountedPrice?: number | null;
   originalPrice: number;
-  images?: (number | Media)[] | null;
-  category: number | ProductCategory;
-  tags?: (number | ProductTag)[] | null;
-  brand?: (number | null) | Brand;
+  images?: (string | Media)[] | null;
+  category: string | ProductCategory;
+  tags?: (string | ProductTag)[] | null;
+  brand?: (string | null) | Brand;
   additionalData?: {
     root: {
       type: string;
@@ -277,7 +278,7 @@ export interface Product {
   /**
    * Variants attached to this product with quantities. Use the Product Variant Mappings collection to manage these.
    */
-  variantMappings?: (number | ProductVariantMapping)[] | null;
+  variantMappings?: (string | ProductVariantMapping)[] | null;
   /**
    * Auto-calculated: sum of all variant quantities
    */
@@ -289,7 +290,7 @@ export interface Product {
     /**
      * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
      */
-    image?: (number | null) | Media;
+    image?: (string | null) | Media;
     jsonLD?:
       | {
           [k: string]: unknown;
@@ -311,15 +312,15 @@ export interface Product {
  * via the `definition` "product-variant-mappings".
  */
 export interface ProductVariantMapping {
-  id: number;
+  id: string;
   /**
    * The product this variant is attached to. Cannot be changed after creation to prevent inventory conflicts.
    */
-  product: number | Product;
+  product: string | Product;
   /**
    * The variant being attached to the product. Cannot be changed after creation.
    */
-  variant: number | ProductVariant;
+  variant: string | ProductVariant;
   /**
    * Available stock for this variant on this product
    */
@@ -350,7 +351,7 @@ export interface ProductVariantMapping {
  * via the `definition` "product-variants".
  */
 export interface ProductVariant {
-  id: number;
+  id: string;
   /**
    * e.g., "Bottle of 30 tablets", "Large Size", "Red Color"
    */
@@ -383,13 +384,13 @@ export interface ProductVariant {
  * via the `definition` "orders".
  */
 export interface Order {
-  id: number;
+  id: string;
   name: string;
   email: string;
   phone: string;
   address: string;
   cartItems: {
-    product: number | Product;
+    product: string | Product;
     quantity: number;
     priceAtPurchase: number;
     variant?: {
@@ -414,7 +415,7 @@ export interface Order {
  * via the `definition` "blog-tags".
  */
 export interface BlogTag {
-  id: number;
+  id: string;
   name: string;
   updatedAt: string;
   createdAt: string;
@@ -424,7 +425,7 @@ export interface BlogTag {
  * via the `definition` "blog-categories".
  */
 export interface BlogCategory {
-  id: number;
+  id: string;
   name: string;
   slug?: string | null;
   updatedAt: string;
@@ -435,10 +436,10 @@ export interface BlogCategory {
  * via the `definition` "blogs".
  */
 export interface Blog {
-  id: number;
+  id: string;
   title: string;
   slug?: string | null;
-  featuredImage?: (number | null) | Media;
+  featuredImage?: (string | null) | Media;
   excerpt?: string | null;
   content: {
     root: {
@@ -455,8 +456,8 @@ export interface Blog {
     };
     [k: string]: unknown;
   };
-  category?: (number | null) | BlogCategory;
-  tags?: (number | BlogTag)[] | null;
+  category?: (string | null) | BlogCategory;
+  tags?: (string | BlogTag)[] | null;
   published?: boolean | null;
   meta?: {
     title?: string | null;
@@ -464,7 +465,7 @@ export interface Blog {
     /**
      * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
      */
-    image?: (number | null) | Media;
+    image?: (string | null) | Media;
     jsonLD?:
       | {
           [k: string]: unknown;
@@ -484,11 +485,11 @@ export interface Blog {
  * via the `definition` "hero-slides".
  */
 export interface HeroSlide {
-  id: number;
+  id: string;
   caption?: string | null;
   title: string;
-  product: number | Product;
-  image: number | Media;
+  product: string | Product;
+  image: string | Media;
   enabled?: boolean | null;
   updatedAt: string;
   createdAt: string;
@@ -498,64 +499,64 @@ export interface HeroSlide {
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
-  id: number;
+  id: string;
   document?:
     | ({
         relationTo: 'users';
-        value: number | User;
+        value: string | User;
       } | null)
     | ({
         relationTo: 'media';
-        value: number | Media;
+        value: string | Media;
       } | null)
     | ({
         relationTo: 'product-categories';
-        value: number | ProductCategory;
+        value: string | ProductCategory;
       } | null)
     | ({
         relationTo: 'product-tags';
-        value: number | ProductTag;
+        value: string | ProductTag;
       } | null)
     | ({
         relationTo: 'brands';
-        value: number | Brand;
+        value: string | Brand;
       } | null)
     | ({
         relationTo: 'products';
-        value: number | Product;
+        value: string | Product;
       } | null)
     | ({
         relationTo: 'orders';
-        value: number | Order;
+        value: string | Order;
       } | null)
     | ({
         relationTo: 'blog-tags';
-        value: number | BlogTag;
+        value: string | BlogTag;
       } | null)
     | ({
         relationTo: 'blog-categories';
-        value: number | BlogCategory;
+        value: string | BlogCategory;
       } | null)
     | ({
         relationTo: 'blogs';
-        value: number | Blog;
+        value: string | Blog;
       } | null)
     | ({
         relationTo: 'hero-slides';
-        value: number | HeroSlide;
+        value: string | HeroSlide;
       } | null)
     | ({
         relationTo: 'product-variants';
-        value: number | ProductVariant;
+        value: string | ProductVariant;
       } | null)
     | ({
         relationTo: 'product-variant-mappings';
-        value: number | ProductVariantMapping;
+        value: string | ProductVariantMapping;
       } | null);
   globalSlug?: string | null;
   user: {
     relationTo: 'users';
-    value: number | User;
+    value: string | User;
   };
   updatedAt: string;
   createdAt: string;
@@ -565,10 +566,10 @@ export interface PayloadLockedDocument {
  * via the `definition` "payload-preferences".
  */
 export interface PayloadPreference {
-  id: number;
+  id: string;
   user: {
     relationTo: 'users';
-    value: number | User;
+    value: string | User;
   };
   key?: string | null;
   value?:
@@ -588,7 +589,7 @@ export interface PayloadPreference {
  * via the `definition` "payload-migrations".
  */
 export interface PayloadMigration {
-  id: number;
+  id: string;
   name?: string | null;
   batch?: number | null;
   updatedAt: string;
@@ -622,6 +623,7 @@ export interface UsersSelect<T extends boolean = true> {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  _key?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

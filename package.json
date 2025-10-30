@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "marked": "^16.2.1",
+    "mongodb": "^6.20.0",
     "pg": "^8.16.3",
     "puppeteer": "^24.19.0"
   }
