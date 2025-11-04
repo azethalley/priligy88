@@ -15,13 +15,19 @@ export const GET: APIRoute = async ({ params }) => {
     const payloadClient = await payload();
 
     // First get the product to find its variant mappings
-    const product = await payloadClient.findByID({
+    // Use find instead of findByID for better ID format compatibility
+    const result = await payloadClient.find({
       collection: "products",
-      id: productId,
+      where: {
+        id: { equals: productId },
+      },
       select: {
         variantMappings: true,
       },
+      limit: 1,
     });
+
+    const product = result?.docs?.[0];
 
     if (!product) {
       console.warn(`Product with ID ${productId} not found`);
