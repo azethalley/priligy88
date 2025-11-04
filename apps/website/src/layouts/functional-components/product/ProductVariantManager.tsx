@@ -7,6 +7,7 @@ import {
   extractVariantId,
   extractMappingId,
   normalizeVariantId,
+  normalizeProductId,
 } from "@/lib/utils/variantId";
 
 interface ProductVariantManagerProps {
@@ -34,12 +35,15 @@ export function ProductVariantManager({
   useEffect(() => {
     if (!mounted || !product?.id) return;
 
+    // Normalize product ID to string (handles MongoDB ObjectId objects)
+    const normalizedProductId = normalizeProductId(product.id);
+
     const fetchVariants = async () => {
       try {
-        const response = await fetch(`/api/product-variants/${product.id}`);
+        const response = await fetch(`/api/product-variants/${normalizedProductId}`);
         if (!response.ok) {
           console.warn(
-            `Failed to fetch variants for product ${product.id}: ${response.status}`,
+            `Failed to fetch variants for product ${normalizedProductId}: ${response.status}`,
           );
           setProcessedVariants([]);
           setSelectedVariant(null);

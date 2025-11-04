@@ -17,7 +17,7 @@ export function getLayoutView() {
 }
 
 export interface CartItem {
-  id: number;
+  id: string | number; // Support both string (MongoDB ObjectId) and number (PostgreSQL)
   title: string;
   price: number;
   quantity: number;
@@ -65,7 +65,7 @@ export const cartOperations = {
 
     // Find existing item by product ID and variant ID (if variant exists)
     const existingItem = currentCart.items.find((i) => {
-      if (i.id !== item.id) return false;
+      if (String(i.id) !== String(item.id)) return false;
 
       // If both have variants, compare variant IDs using utility
       if (i.variant && item.variant) {
@@ -85,7 +85,7 @@ export const cartOperations = {
       cartStore.set({
         items: currentCart.items.map((i) => {
           const isSameItem =
-            i.id === item.id &&
+            String(i.id) === String(item.id) &&
             ((i.variant &&
               item.variant &&
               compareVariantIds(i.variant.id, item.variant.id)) ||
@@ -102,11 +102,11 @@ export const cartOperations = {
       });
     }
   },
-  removeItem: (id: number, variantId?: VariantId) => {
+  removeItem: (id: string | number, variantId?: VariantId) => {
     const currentCart = cartStore.get();
     cartStore.set({
       items: currentCart.items.filter((item) => {
-        if (item.id !== id) return true;
+        if (String(item.id) !== String(id)) return true;
 
         // If variantId is provided, only remove if variant matches
         if (variantId && item.variant) {
@@ -118,12 +118,12 @@ export const cartOperations = {
       }),
     });
   },
-  updateQuantity: (id: number, quantity: number, variantId?: VariantId) => {
+  updateQuantity: (id: string | number, quantity: number, variantId?: VariantId) => {
     const currentCart = cartStore.get();
     if (quantity <= 0) {
       cartStore.set({
         items: currentCart.items.filter((item) => {
-          if (item.id !== id) return true;
+          if (String(item.id) !== String(id)) return true;
 
           // If variantId is provided, only remove if variant matches
           if (variantId && item.variant) {
@@ -137,7 +137,7 @@ export const cartOperations = {
     } else {
       cartStore.set({
         items: currentCart.items.map((item) => {
-          if (item.id !== id) return item;
+          if (String(item.id) !== String(id)) return item;
 
           // If variantId is provided, only update if variant matches
           if (variantId && item.variant) {
@@ -169,20 +169,21 @@ export function resetCart() {
 
 // Cart actions
 // Helper functions
-export function isInCart(productId: number) {
-  return cartStore.get().items.some((item) => item.id === productId);
+export function isInCart(productId: string | number) {
+  return cartStore.get().items.some((item) => String(item.id) === String(productId));
 }
 
-export function getItemQuantity(productId: number) {
-  const item = cartStore.get().items.find((item) => item.id === productId);
+export function getItemQuantity(productId: string | number) {
+  const item = cartStore.get().items.find((item) => String(item.id) === String(productId));
   return item?.quantity || 0;
 }
 
 // Function to remove invalid items from cart
-export function removeInvalidItems(validProductIds: number[]) {
+export function removeInvalidItems(validProductIds: (string | number)[]) {
   const currentCart = cartStore.get();
+  const validIds = validProductIds.map(id => String(id));
   const validItems = currentCart.items.filter((item) =>
-    validProductIds.includes(item.id),
+    validIds.includes(String(item.id)),
   );
   cartStore.set({ items: validItems });
 }

@@ -4,7 +4,7 @@ import { cartOperations } from "@/cartStore";
 import LoadingDots from "../loadings/LoadingDots";
 
 interface EditItemQuantityButtonProps {
-  productId: number;
+  productId: string | number; 
   variantId?: string | number;
   currentQuantity: number;
   type: "plus" | "minus";
