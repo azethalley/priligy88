@@ -5,6 +5,8 @@ export const GET: APIRoute = async ({ params }) => {
   try {
     let { productId } = params;
 
+    console.log(`[API] Received productId param:`, productId, `Type:`, typeof productId);
+
     if (!productId) {
       return new Response(JSON.stringify({ error: "Product ID is required" }), {
         status: 400,
@@ -14,7 +16,17 @@ export const GET: APIRoute = async ({ params }) => {
 
     // Normalize productId to handle string format variations
     // MongoDB ObjectIds from URL params are already strings, but ensure consistency
+    // Handle the case where productId might be "[object Object]" string
+    if (String(productId) === "[object Object]") {
+      console.error(`[API] Received "[object Object]" as productId - this indicates the ID wasn't properly serialized`);
+      return new Response(JSON.stringify({ error: "Invalid product ID format", variants: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     productId = String(productId).trim();
+    console.log(`[API] Normalized productId:`, productId);
     
     if (!productId) {
       return new Response(JSON.stringify({ error: "Product ID is required" }), {

@@ -37,8 +37,12 @@ export function ProductVariantManager({
 
     const fetchVariants = async () => {
       try {
+        console.log(`[ProductVariantManager] Product ID before normalization:`, product.id, `Type:`, typeof product.id);
+        
         // Normalize product ID to string (handles MongoDB ObjectIds)
         const productId = normalizeProductId(product.id);
+        console.log(`[ProductVariantManager] Product ID after normalization:`, productId, `Type:`, typeof productId);
+        
         if (!productId) {
           console.warn("Product ID is missing or invalid");
           setProcessedVariants([]);
@@ -46,6 +50,7 @@ export function ProductVariantManager({
           return;
         }
         
+        console.log(`[ProductVariantManager] Fetching variants for product ID:`, productId);
         const response = await fetch(`/api/product-variants/${productId}`);
         if (!response.ok) {
           console.warn(

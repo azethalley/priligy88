@@ -11,6 +11,7 @@ import config from "@/config/config.json";
 import { generatPayloadImageUrl } from "@/lib/utils";
 import type { Media, Product, ProductCategory, ProductTag } from "payload_app";
 import { ProductVariantManager } from "@/layouts/functional-components/product/ProductVariantManager";
+import { normalizeProductId } from "@/lib/utils/variantId";
 import {
   convertLexicalToHTMLAsync,
   type HTMLConvertersFunctionAsync,
@@ -81,6 +82,18 @@ if (!product) {
 
 // TypeScript assertion - we know product is not null at this point
 const productData = product as Product;
+
+// Normalize product ID to string for proper serialization when passing to React components
+// This handles MongoDB ObjectIds which don't serialize properly when passed from Astro to React
+const normalizedProductId = normalizeProductId(productData.id);
+console.log(`[Astro] Normalizing product ID: ${typeof productData.id} -> ${normalizedProductId} (type: ${typeof normalizedProductId})`);
+
+// Create a serialized version of product with normalized ID for React components
+// We only need to ensure the ID is a string - Astro will handle serialization of the rest
+const serializedProduct: Product = {
+  ...productData,
+  id: normalizedProductId as any, // Cast to any since Product type might expect a specific ID type
+};
 
 const {
   id,
@@ -214,7 +227,7 @@ const productTags = (Array.isArray(tags) ? tags : [])
           <!-- Variant Manager (includes variant selector and add to cart) -->
           <ProductVariantManager
             client:only="react"
-            product={productData}
+            product={serializedProduct}
             stylesClass={"btn max-md:btn-sm btn-primary"}
           />
 
