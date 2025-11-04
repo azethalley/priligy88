@@ -177,17 +177,38 @@ const Products: CollectionConfig = {
     // Only calculate totalStock when reading products - no expensive variant population
     afterRead: [
       async ({ doc, req }) => {
-        if (doc.variantMappings) {
-          // Only calculate total stock - this is lightweight and needed for admin
-          doc.totalStock = await calculateTotalStockFromMappings(doc.variantMappings, req)
+        // Preserve the stored totalStock value as fallback
+        const storedTotalStock = doc.totalStock ?? 0
+        
+        // Only calculate if we have variantMappings AND req.payload is available
+        if (doc.variantMappings && req?.payload) {
+          try {
+            // Only calculate total stock - this is lightweight and needed for admin
+            const calculatedStock = await calculateTotalStockFromMappings(doc.variantMappings, req)
+            
+            // Always use calculated value when calculation succeeds (even if 0, as that's accurate)
+            doc.totalStock = calculatedStock
 
-          // Don't populate variantDetails here - use API endpoint instead for better performance
-          doc.variantDetails = []
+            // Don't populate variantDetails here - use API endpoint instead for better performance
+            doc.variantDetails = []
+          } catch (error) {
+            console.error('Error calculating totalStock in afterRead hook:', error)
+            // Preserve stored value if calculation fails
+            doc.totalStock = storedTotalStock
+            doc.variantDetails = []
+          }
         } else {
           doc.variantDetails = []
-          doc.totalStock = 0
+          // If no variantMappings or no req.payload, preserve stored value instead of setting to 0
+          // Only set to 0 if we explicitly know there are no variant mappings
+          if (!doc.variantMappings) {
+            doc.totalStock = 0
+          } else {
+            // variantMappings exists but req.payload is not available - preserve stored value
+            doc.totalStock = storedTotalStock
+          }
         }
-        console.log("[TRACE] doc.totalStock = ", doc.totalSotck)
+        console.log("[TRACE] doc.totalStock = ", doc.totalStock)
         return doc
       },
     ],
@@ -207,7 +228,7 @@ const Products: CollectionConfig = {
             })
           }
         }
-        console.log("[TRACE] doc.totalStock = ", doc.totalSotck)
+        console.log("[TRACE] doc.totalStock = ", doc.totalStock)
         return doc
       },
     ],
