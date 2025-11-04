@@ -2,6 +2,27 @@ import type { CollectionConfig } from 'payload'
 import { slugField } from '../utils/slug'
 import { calculateTotalStock } from '../utils/stockUtils'
 
+// Helper function to normalize IDs (handles Buffer/ObjectId, string, number, or object with id)
+function normalizeId(id: any): string | number {
+  // Handle Buffer (MongoDB ObjectId binary format)
+  if (Buffer.isBuffer(id)) {
+    return id.toString('hex')
+  }
+  
+  // Handle object with id property
+  if (typeof id === 'object' && id !== null && 'id' in id) {
+    return normalizeId(id.id)
+  }
+  
+  // Handle string or number
+  if (typeof id === 'string' || typeof id === 'number') {
+    return id
+  }
+  
+  // Fallback: try to convert to string
+  return String(id)
+}
+
 // Helper function to calculate total stock from variant mappings
 async function calculateTotalStockFromMappings(
   variantMappings:
@@ -37,13 +58,8 @@ async function calculateTotalStockFromMappings(
       return calculateTotalStock(populatedMappings as any[])
     }
 
-    // Need to fetch mapping documents - extract IDs
-    const mappingIds = variantMappings.map((mapping) => {
-      if (typeof mapping === 'object' && mapping !== null && 'id' in mapping) {
-        return mapping.id
-      }
-      return mapping
-    })
+    // Need to fetch mapping documents - extract and normalize IDs
+    const mappingIds = variantMappings.map((mapping) => normalizeId(mapping)).filter(Boolean)
 
     const mappings = await payloadInstance.find({
       collection: 'product-variant-mappings',

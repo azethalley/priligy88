@@ -6,6 +6,27 @@ export interface PageInfo {
   endCursor: string | null;
 }
 
+// Helper function to normalize IDs (handles Buffer/ObjectId, string, number, or object with id)
+function normalizeId(id: any): string | number {
+  // Handle Buffer (MongoDB ObjectId binary format)
+  if (Buffer.isBuffer(id)) {
+    return id.toString('hex')
+  }
+  
+  // Handle object with id property
+  if (typeof id === 'object' && id !== null && 'id' in id) {
+    return normalizeId(id.id)
+  }
+  
+  // Handle string or number
+  if (typeof id === 'string' || typeof id === 'number') {
+    return id
+  }
+  
+  // Fallback: try to convert to string
+  return String(id)
+}
+
 // Helper function to populate tags if they're not already populated
 async function populateTags(
   payloadClient: any,
@@ -25,19 +46,10 @@ async function populateTags(
     return product;
   }
 
-  // Extract tag IDs (could be numbers, strings, or objects with id property)
+  // Extract and normalize tag IDs (handles Buffer/ObjectId, string, number, or object with id)
   const tagIds = product.tags
-    .map((tag: any) => {
-      if (typeof tag === "number" || typeof tag === "string") {
-        return tag;
-      }
-      if (typeof tag === "object" && tag !== null) {
-        return tag?.id || tag;
-      }
-      return null;
-    })
-    .filter((id: any) => id != null)
-    .map((id: any) => String(id)); // Normalize to strings for comparison
+    .map((tag: any) => normalizeId(tag))
+    .filter((id: any) => id != null && id !== '')
 
   if (tagIds.length === 0) {
     product.tags = [];
@@ -46,16 +58,26 @@ async function populateTags(
 
   // Fetch the tag documents
   try {
-    // Convert tagIds back to numbers if they're numeric strings (for database queries)
-    const numericTagIds = tagIds.map((id: string) => {
-      const num = Number(id);
-      return isNaN(num) ? id : num;
+    // Convert tagIds - handle both hex strings (ObjectIds) and numeric strings
+    // For MongoDB ObjectIds (24 char hex), keep as string
+    // For numeric IDs, convert to number
+    const normalizedTagIds = tagIds.map((id: string | number) => {
+      if (typeof id === 'number') {
+        return id
+      }
+      // If it's a 24-character hex string (ObjectId), keep as string
+      if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
+        return id
+      }
+      // Try to convert to number if it's numeric
+      const num = Number(id)
+      return isNaN(num) ? id : num
     });
 
     const { docs: tagDocs } = await payloadClient.find({
       collection: "product-tags",
       where: {
-        id: { in: numericTagIds },
+        id: { in: normalizedTagIds },
       },
       limit: tagIds.length,
       overrideAccess: true, // Bypass access controls since this is server-side
