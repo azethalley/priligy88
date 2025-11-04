@@ -17,7 +17,7 @@ export function getLayoutView() {
 }
 
 export interface CartItem {
-  id: number;
+  id: string | number; // Support both string (MongoDB ObjectId) and number IDs
   title: string;
   price: number;
   quantity: number;
@@ -102,7 +102,7 @@ export const cartOperations = {
       });
     }
   },
-  removeItem: (id: number, variantId?: VariantId) => {
+  removeItem: (id: string | number, variantId?: VariantId) => {
     const currentCart = cartStore.get();
     cartStore.set({
       items: currentCart.items.filter((item) => {
@@ -118,7 +118,7 @@ export const cartOperations = {
       }),
     });
   },
-  updateQuantity: (id: number, quantity: number, variantId?: VariantId) => {
+  updateQuantity: (id: string | number, quantity: number, variantId?: VariantId) => {
     const currentCart = cartStore.get();
     if (quantity <= 0) {
       cartStore.set({
@@ -169,17 +169,17 @@ export function resetCart() {
 
 // Cart actions
 // Helper functions
-export function isInCart(productId: number) {
+export function isInCart(productId: string | number) {
   return cartStore.get().items.some((item) => item.id === productId);
 }
 
-export function getItemQuantity(productId: number) {
+export function getItemQuantity(productId: string | number) {
   const item = cartStore.get().items.find((item) => item.id === productId);
   return item?.quantity || 0;
 }
 
 // Function to remove invalid items from cart
-export function removeInvalidItems(validProductIds: number[]) {
+export function removeInvalidItems(validProductIds: (string | number)[]) {
   const currentCart = cartStore.get();
   const validItems = currentCart.items.filter((item) =>
     validProductIds.includes(item.id),

@@ -40,3 +40,30 @@ export function extractMappingId(variantDetail: any): string {
   // For mapping operations, we need the mapping ID (not the variant ID)
   return normalizeVariantId(variantDetail?.id);
 }
+
+/**
+ * Normalize product ID to string
+ * Handles MongoDB ObjectIds, string/number IDs, and other formats
+ */
+export function normalizeProductId(id: any): string {
+  if (id === null || id === undefined) {
+    return "";
+  }
+  
+  // Handle MongoDB ObjectId objects
+  if (typeof id === "object" && id !== null) {
+    // If it has toString method (like ObjectId), use it
+    if (typeof id.toString === "function") {
+      return id.toString();
+    }
+    // If it has an id property, use that
+    if (id.id !== undefined) {
+      return normalizeProductId(id.id);
+    }
+    // Last resort: try JSON.stringify (but this shouldn't happen)
+    return String(id);
+  }
+  
+  // Handle string/number
+  return String(id);
+}

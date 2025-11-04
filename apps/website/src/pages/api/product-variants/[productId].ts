@@ -3,8 +3,19 @@ import { payload } from "@/lib/payload";
 
 export const GET: APIRoute = async ({ params }) => {
   try {
-    const { productId } = params;
+    let { productId } = params;
 
+    if (!productId) {
+      return new Response(JSON.stringify({ error: "Product ID is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Normalize productId to handle string format variations
+    // MongoDB ObjectIds from URL params are already strings, but ensure consistency
+    productId = String(productId).trim();
+    
     if (!productId) {
       return new Response(JSON.stringify({ error: "Product ID is required" }), {
         status: 400,
