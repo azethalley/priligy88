@@ -25,9 +25,12 @@ export const POST: APIRoute = async ({ request }) => {
       where: {
         and: [{ id: { equals: productId } }, { published: { equals: true } }],
       },
-      depth: 2,
+      depth: 2, // Populate variantMappings and their variants
       limit: 1,
     });
+    
+    // Note: depth: 2 should populate variantMappings, but if they're still Buffer objects,
+    // we'll handle that in the variant mapping lookup
 
     const product = result?.docs?.[0] as any;
     if (!product) {
@@ -114,10 +117,30 @@ export const POST: APIRoute = async ({ request }) => {
         );
       }
 
+      // Check if variant is populated (should be with depth: 2)
+      if (!variantMapping.variant || typeof variantMapping.variant !== "object") {
+        return new Response(
+          JSON.stringify({ ok: false, error: "Variant data not available" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      
       const variant = variantMapping.variant;
-      const available =
-        Boolean(variantMapping.isActive) &&
-        Boolean(variantMapping.quantity > 0);
+      
+      // Properly check availability - handle undefined/null values
+      // isActive might be undefined, true, false, or a string
+      const isActive = variantMapping.isActive !== undefined && variantMapping.isActive !== null
+        ? (variantMapping.isActive === true || variantMapping.isActive === "true" || variantMapping.isActive === 1 || String(variantMapping.isActive).toLowerCase() === "true")
+        : true; // Default to true if not specified (assuming active if not explicitly set to false)
+      
+      // Convert quantity to number and check if it's greater than 0
+      // Handle cases where quantity might be undefined, null, or a string
+      const quantity = variantMapping.quantity !== undefined && variantMapping.quantity !== null
+        ? Number(variantMapping.quantity)
+        : 0;
+      const hasStock = !isNaN(quantity) && quantity > 0;
+      
+      const available = isActive && hasStock;
 
       if (!available) {
         return new Response(
