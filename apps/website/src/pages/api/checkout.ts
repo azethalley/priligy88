@@ -69,7 +69,7 @@ async function validateAndGetProducts(items: CartItem[]) {
       // Find the variant mapping for this product and variant using robust matching
       // Check both variant.id and variant.mappingId if available
       const variantMapping = findVariantMapping(
-        product.variantMappings, 
+        product.variantMappings || [], 
         item.variant.id,
         (item.variant as any).mappingId
       );
@@ -201,10 +201,13 @@ async function deductStockFromOrder(cartItems: CartItem[], products: any[]) {
         // Normalize mapping ID for database operation (handles ObjectIds and Buffers)
         const normalizedMappingId = normalizeMappingId(variantMapping);
 
+        // Only update quantity field - do not include product or variant fields to avoid validation errors
         await payloadClient.update({
           collection: "product-variant-mappings",
           id: normalizedMappingId,
-          data: { quantity: newQuantity },
+          data: { 
+            quantity: newQuantity,
+          },
         });
       }
     } else {
@@ -222,10 +225,16 @@ async function deductStockFromOrder(cartItems: CartItem[], products: any[]) {
         // Normalize mapping ID for database operation (handles ObjectIds and Buffers)
         const normalizedMappingId = normalizeMappingId(defaultMapping);
 
+        // Only update quantity field - exclude all relation fields to avoid validation errors
         await payloadClient.update({
           collection: "product-variant-mappings",
           id: normalizedMappingId,
-          data: { quantity: newQuantity },
+          data: { 
+            quantity: newQuantity,
+            // Explicitly exclude product and variant to prevent validation hook errors
+            product: undefined,
+            variant: undefined,
+          },
         });
       }
     }
@@ -256,10 +265,13 @@ async function restoreStockFromOrder(cartItems: CartItem[], products: any[]) {
         // Normalize mapping ID for database operation (handles ObjectIds and Buffers)
         const normalizedMappingId = normalizeMappingId(variantMapping);
 
+        // Only update quantity field - do not include product or variant fields to avoid validation errors
         await payloadClient.update({
           collection: "product-variant-mappings",
           id: normalizedMappingId,
-          data: { quantity: newQuantity },
+          data: { 
+            quantity: newQuantity,
+          },
         });
       }
     }
@@ -357,7 +369,7 @@ export const POST: APIRoute = async ({ request }) => {
         // Find the variant mapping for this product and variant using robust matching
         // Check both variant.id and variant.mappingId if available
         const variantMapping = findVariantMapping(
-          product.variantMappings, 
+          product.variantMappings || [], 
           item.variant.id,
           (item.variant as any).mappingId
         );
