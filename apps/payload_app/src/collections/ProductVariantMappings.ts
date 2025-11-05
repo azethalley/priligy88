@@ -130,31 +130,64 @@ const ProductVariantMappings: CollectionConfig = {
     // Validate that the same variant isn't mapped twice to the same product
     beforeValidate: [
       async ({ data, req, operation: _operation, originalDoc }) => {
-        // Skip validation if data is missing or relation fields are not being updated
-        // Only validate if product/variant are explicitly being changed
+        // Skip validation if data is missing
         if (!data) return data
         
-        // For updates, only check if product/variant are explicitly in the update data
-        // If they're not present, it means we're only updating other fields (like quantity)
+        // For updates, check if we're only updating non-relation fields (like quantity)
+        // PayloadCMS may auto-include populated relation fields, so we need to check both
+        // key existence AND whether the value is actually different
         if (_operation === 'update') {
-          // If product is not in the update data, skip product validation
-          if (!('product' in data)) {
-            // Remove product from data to prevent any issues
+          // Normalize product IDs for comparison (handles ObjectIds vs strings vs objects)
+          const normalizeProductId = (id: any): string => {
+            if (!id) return ''
+            if (typeof id === 'string') return id
+            if (typeof id === 'number') return String(id)
+            if (typeof id === 'object' && id !== null) {
+              if (id.id) return normalizeProductId(id.id)
+              if (id.toString) return id.toString()
+            }
+            return String(id)
+          }
+          
+          // Check if product is being changed (compare normalized IDs)
+          const hasProduct = 'product' in data && data.product !== undefined && data.product !== null
+          if (hasProduct) {
+            const originalProductId = normalizeProductId(originalDoc?.product)
+            const newProductId = normalizeProductId(data.product)
+            
+            // Only validate if product is actually being changed
+            if (originalProductId && newProductId && originalProductId !== newProductId) {
+              throw new Error(
+                'Cannot change the product of an existing variant mapping. Each variant mapping is tied to a specific product.',
+              )
+            }
+            // If product is present but same, remove it to avoid duplicate check issues
+            if (originalProductId === newProductId) {
+              delete data.product
+            }
+          } else {
+            // Product not in update - remove it if it exists
             delete data.product
-          } else if (originalDoc && originalDoc.product !== data.product) {
-            // Only validate if product is explicitly being changed
-            throw new Error(
-              'Cannot change the product of an existing variant mapping. Each variant mapping is tied to a specific product.',
-            )
           }
           
           // Same for variant
-          if (!('variant' in data)) {
+          const hasVariant = 'variant' in data && data.variant !== undefined && data.variant !== null
+          if (hasVariant) {
+            const originalVariantId = normalizeProductId(originalDoc?.variant)
+            const newVariantId = normalizeProductId(data.variant)
+            
+            if (originalVariantId && newVariantId && originalVariantId !== newVariantId) {
+              // Variant is being changed - this is also not allowed but we'll handle it gracefully
+              delete data.variant
+            } else if (originalVariantId === newVariantId) {
+              delete data.variant
+            }
+          } else {
             delete data.variant
           }
           
           // If neither product nor variant are being updated, skip the duplicate check
-          if (!('product' in data) && !('variant' in data)) {
+          if (!hasProduct && !hasVariant) {
             return data
           }
         }
