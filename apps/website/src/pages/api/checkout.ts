@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { payload } from "@/lib/payload";
 import type { Product } from "payload_app";
 import { sendOrderConfirmationEmail } from "@/lib/email";
-import { compareVariantIds, normalizeVariantId } from "@/lib/utils/variantId";
+import { compareVariantIds, normalizeVariantId, normalizeProductId } from "@/lib/utils/variantId";
 import { getVariantPrice, getProductPrice } from "@/lib/utils/pricing";
 
 interface CartItem {
@@ -44,10 +44,11 @@ async function validateAndGetProducts(items: CartItem[]) {
     depth: 2, // Include variant mappings and their variants
   });
 
-  // Check which products are missing
-  const foundProductIds = products.map((p) => p.id);
-  const missingProductIds = productIds.filter(
-    (id) => !foundProductIds.includes(id),
+  // Normalize product IDs for comparison (handles MongoDB ObjectIds)
+  const normalizedCartIds = productIds.map((id) => normalizeProductId(id));
+  const normalizedFoundIds = products.map((p) => normalizeProductId(p.id));
+  const missingProductIds = normalizedCartIds.filter(
+    (id) => !normalizedFoundIds.includes(id),
   );
 
   if (missingProductIds.length > 0) {
@@ -59,7 +60,8 @@ async function validateAndGetProducts(items: CartItem[]) {
   // Check stock availability for each item
   const stockIssues: string[] = [];
   for (const item of items) {
-    const product = products.find((p) => p.id === item.id);
+    const normalizedItemId = normalizeProductId(item.id);
+    const product = products.find((p) => normalizeProductId(p.id) === normalizedItemId);
     if (!product) continue;
 
     // Check variant stock if item has a variant
@@ -110,7 +112,8 @@ async function deductStockFromOrder(cartItems: CartItem[], products: any[]) {
   const payloadClient = await payload();
 
   for (const item of cartItems) {
-    const product = products.find((p) => p.id === item.id);
+    const normalizedItemId = normalizeProductId(item.id);
+    const product = products.find((p) => normalizeProductId(p.id) === normalizedItemId);
     if (!product) continue;
 
     if (item.variant) {
@@ -161,7 +164,8 @@ async function restoreStockFromOrder(cartItems: CartItem[], products: any[]) {
   const payloadClient = await payload();
 
   for (const item of cartItems) {
-    const product = products.find((p) => p.id === item.id);
+    const normalizedItemId = normalizeProductId(item.id);
+    const product = products.find((p) => normalizeProductId(p.id) === normalizedItemId);
     if (!product) continue;
 
     if (item.variant) {
@@ -264,7 +268,8 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Create formatted cart items with actual prices from database
     const formattedCartItems = cartItems.map((item) => {
-      const product = products.find((p) => p.id === item.id) as Product;
+      const normalizedItemId = normalizeProductId(item.id);
+      const product = products.find((p) => normalizeProductId(p.id) === normalizedItemId) as Product;
       if (!product) throw new Error(`Product ${item.id} not found`);
 
       // Determine price based on variant or product
