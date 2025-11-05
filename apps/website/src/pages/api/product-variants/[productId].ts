@@ -36,32 +36,60 @@ export const GET: APIRoute = async ({ params }) => {
     }
 
     const payloadClient = await payload();
+    console.log(`[API] Payload client initialized, querying product...`);
 
     // First get the product to find its variant mappings
     // Use find instead of findByID for better ID format compatibility
-    const result = await payloadClient.find({
-      collection: "products",
-      where: {
-        id: { equals: productId },
-      },
-      select: {
-        variantMappings: true,
-      },
-      limit: 1,
-    });
+    // Remove select to get all fields - variantMappings might need related fields
+    console.log(`[API] Starting product query with ID: ${productId}`);
+    let result;
+    try {
+      // Use Promise.race to add a timeout
+      const queryPromise = payloadClient.find({
+        collection: "products",
+        where: {
+          id: { equals: productId },
+        },
+        // Don't use select - it might be causing issues with relationships
+        limit: 1,
+      });
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout after 20 seconds')), 20000)
+      );
+      
+      result = await Promise.race([queryPromise, timeoutPromise]) as any;
+      console.log(`[API] Product query completed, found ${result?.docs?.length || 0} products`);
+    } catch (error) {
+      console.error(`[API] Error querying product:`, error);
+      console.error(`[API] Error message:`, error instanceof Error ? error.message : String(error));
+      console.error(`[API] Error stack:`, error instanceof Error ? error.stack : String(error));
+      return new Response(
+        JSON.stringify({ error: "Database query failed or timed out", variants: [] }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
 
     const product = result?.docs?.[0];
 
     if (!product) {
-      console.warn(`Product with ID ${productId} not found`);
+      console.warn(`[API] Product with ID ${productId} not found`);
       return new Response(JSON.stringify({ variants: [] }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
     }
 
+    console.log(`[API] Product found: ${(product as any).title || product.id}`);
+    console.log(`[API] Product variantMappings:`, product.variantMappings);
+    console.log(`[API] Product variantMappings type:`, typeof product.variantMappings);
+    console.log(`[API] Product variantMappings length:`, product.variantMappings?.length);
+
     if (!product.variantMappings?.length) {
-      console.warn(`Product ${productId} has no variant mappings`);
+      console.warn(`[API] Product ${productId} has no variant mappings`);
       return new Response(JSON.stringify({ variants: [] }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -69,9 +97,27 @@ export const GET: APIRoute = async ({ params }) => {
     }
 
     // Get the variant mappings with their associated variants
-    const mappingIds = product.variantMappings.map((mapping: any) =>
-      typeof mapping === "object" ? mapping.id : mapping,
-    );
+    // Normalize mapping IDs to handle both ObjectIds and string/number IDs
+    const mappingIds = product.variantMappings.map((mapping: any) => {
+      if (typeof mapping === "object" && mapping !== null) {
+        // Handle MongoDB ObjectId objects
+        if (typeof mapping.id === "object" && mapping.id !== null && typeof mapping.id.toString === "function") {
+          return mapping.id.toString();
+        }
+        return String(mapping.id || mapping);
+      }
+      return String(mapping);
+    }).filter(Boolean);
+    
+    console.log(`[API] Extracted ${mappingIds.length} mapping IDs:`, mappingIds);
+
+    if (mappingIds.length === 0) {
+      console.warn(`[API] No mapping IDs found for product ${productId}`);
+      return new Response(JSON.stringify({ variants: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     const mappings = await payloadClient.find({
       collection: "product-variant-mappings",
@@ -79,30 +125,45 @@ export const GET: APIRoute = async ({ params }) => {
         id: { in: mappingIds },
         isActive: { equals: true },
       },
-      depth: 1,
+      depth: 1, // Populate the variant relationship
       limit: 100,
     });
+    
+    console.log(`[API] Query result: Found ${mappings.docs.length} active mappings`);
+
+    console.log(`[API] Found ${mappings.docs.length} variant mappings for product ${productId}`);
+    
+    // Debug: Log first mapping to see structure
+    if (mappings.docs.length > 0) {
+      console.log(`[API] First mapping structure:`, JSON.stringify(mappings.docs[0], null, 2));
+      console.log(`[API] First mapping variant type:`, typeof mappings.docs[0]?.variant);
+      console.log(`[API] First mapping variant:`, mappings.docs[0]?.variant);
+    }
 
     // Transform mappings into frontend-friendly format
     const variants = mappings.docs
       .map((mapping: any) => {
-        const variant =
-          typeof mapping.variant === "object" ? mapping.variant : null;
-        if (!variant) return null;
+        // Check if variant is populated (object) or just an ID
+        let variant = null;
+        if (mapping.variant) {
+          if (typeof mapping.variant === "object" && mapping.variant !== null) {
+            variant = mapping.variant;
+          } else {
+            // Variant is just an ID, we need to fetch it
+            console.warn(`[API] Variant mapping ${mapping.id} has variant as ID (${mapping.variant}), not populated. This should not happen with depth: 1`);
+            return null;
+          }
+        }
+        
+        if (!variant) {
+          console.warn(`[API] Variant mapping ${mapping.id} has no variant object or ID`);
+          return null;
+        }
 
         const price = Number(mapping.priceOverride || variant.price || 0);
         const stock = Number(mapping.quantity || 0);
 
-        console.log(`Variant mapping for product ${productId}:`, {
-          variantId: variant.id,
-          variantName: variant.name,
-          mappingId: mapping.id,
-          stock: stock,
-          price: price,
-          isDefault: mapping.isDefault,
-        });
-
-        return {
+        const variantData = {
           id: String(mapping.id),
           variantId: String(variant.id),
           name: variant.name || "",
@@ -114,8 +175,23 @@ export const GET: APIRoute = async ({ params }) => {
           category: variant.category || "other",
           active: mapping.isActive || false,
         };
+
+        console.log(`[API] Variant mapping for product ${productId}:`, {
+          variantId: variant.id,
+          variantName: variant.name,
+          mappingId: mapping.id,
+          stock: stock,
+          price: price,
+          isDefault: mapping.isDefault,
+          variantData,
+        });
+
+        return variantData;
       })
       .filter(Boolean);
+
+    console.log(`[API] Returning ${variants.length} variants for product ${productId}`);
+    console.log(`[API] Variants data:`, JSON.stringify(variants, null, 2));
 
     return new Response(JSON.stringify({ variants }), {
       status: 200,

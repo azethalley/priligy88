@@ -51,21 +51,52 @@ export function ProductVariantManager({
         }
         
         console.log(`[ProductVariantManager] Fetching variants for product ID:`, productId);
-        const response = await fetch(`/api/product-variants/${productId}`);
+        
+        let response;
+        try {
+          response = await fetch(`/api/product-variants/${productId}`, {
+            signal: AbortSignal.timeout(30000), // 30 second timeout
+          });
+          console.log(`[ProductVariantManager] Fetch response status:`, response.status, response.statusText);
+        } catch (error) {
+          console.error(`[ProductVariantManager] Fetch error:`, error);
+          if (error instanceof Error && error.name === 'TimeoutError') {
+            console.error(`[ProductVariantManager] Request timed out after 30 seconds`);
+          }
+          setProcessedVariants([]);
+          setSelectedVariant(null);
+          return;
+        }
+        
         if (!response.ok) {
+          const errorText = await response.text().catch(() => 'Unable to read error response');
           console.warn(
-            `Failed to fetch variants for product ${productId}: ${response.status}`,
+            `Failed to fetch variants for product ${productId}: ${response.status} ${response.statusText}`,
+            errorText,
           );
           setProcessedVariants([]);
           setSelectedVariant(null);
           return;
         }
 
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+          console.log(`[ProductVariantManager] Successfully parsed JSON response`);
+        } catch (error) {
+          console.error(`[ProductVariantManager] Error parsing JSON response:`, error);
+          const responseText = await response.text().catch(() => 'Unable to read response');
+          console.error(`[ProductVariantManager] Response text:`, responseText);
+          setProcessedVariants([]);
+          setSelectedVariant(null);
+          return;
+        }
+        console.log(`[ProductVariantManager] API response:`, data);
         const variants = data.variants || [];
+        console.log(`[ProductVariantManager] Variants array length:`, variants.length);
 
         if (variants.length > 0) {
-          console.log("Raw variants from API:", variants);
+          console.log("Raw variants from API:", JSON.stringify(variants, null, 2));
 
           const processedVariants: ProcessedVariant[] = variants.map(
             (v: any) => {
@@ -91,7 +122,8 @@ export function ProductVariantManager({
             },
           );
 
-          console.log("Final processed variants:", processedVariants);
+          console.log("Final processed variants:", JSON.stringify(processedVariants, null, 2));
+          console.log(`[ProductVariantManager] Setting ${processedVariants.length} variants`);
           setProcessedVariants(processedVariants);
 
           // Only set default variant if no variant is currently selected
@@ -107,7 +139,8 @@ export function ProductVariantManager({
           setSelectedVariant(null);
         }
       } catch (error) {
-        console.error("Error fetching variants:", error);
+        console.error("[ProductVariantManager] Error fetching variants:", error);
+        console.error("[ProductVariantManager] Error details:", error instanceof Error ? error.stack : String(error));
         setProcessedVariants([]);
         setSelectedVariant(null);
       }
@@ -140,16 +173,26 @@ export function ProductVariantManager({
     );
   }
 
+  // Debug logging for render
+  console.log(`[ProductVariantManager] Rendering with ${processedVariants.length} variants`);
+
   return (
     <div>
       {/* Variant Selector - Display variants between price and Add to Cart */}
-      {processedVariants.length > 0 && (
+      {processedVariants.length > 0 ? (
         <div className="mb-6">
           <ProductVariantSelector
             variants={processedVariants}
             onVariantChange={handleVariantChange}
             selectedVariant={selectedVariant}
           />
+        </div>
+      ) : (
+        <div className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+          {/* Debug: Show when no variants */}
+          {process.env.NODE_ENV === 'development' && (
+            <div>No variants available (processedVariants.length = {processedVariants.length})</div>
+          )}
         </div>
       )}
 
