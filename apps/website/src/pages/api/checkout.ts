@@ -66,13 +66,13 @@ async function validateAndGetProducts(items: CartItem[]) {
 
     // Check variant stock if item has a variant
     if (item.variant) {
-      // Find the variant mapping for this product and variant
-      const variantMapping = product.variantMappings?.find((mapping: any) => {
-        const mappingVariantId = mapping.variant?.id;
-        const itemVariantId = item.variant?.id;
-        // Use consistent comparison utility
-        return compareVariantIds(mappingVariantId, itemVariantId);
-      });
+      // Find the variant mapping for this product and variant using robust matching
+      // Check both variant.id and variant.mappingId if available
+      const variantMapping = findVariantMapping(
+        product.variantMappings, 
+        item.variant.id,
+        (item.variant as any).mappingId
+      );
 
       if (!variantMapping || typeof variantMapping === "number") {
         stockIssues.push(
@@ -108,6 +108,72 @@ async function validateAndGetProducts(items: CartItem[]) {
   return products;
 }
 
+// Helper function to normalize mapping ID (handles Buffer objects and ObjectIds)
+function normalizeMappingId(mapping: any): string {
+  if (Buffer.isBuffer(mapping)) {
+    return mapping.toString('hex');
+  }
+  if (typeof mapping === "object" && mapping !== null) {
+    if (mapping.id !== undefined) {
+      if (Buffer.isBuffer(mapping.id)) {
+        return mapping.id.toString('hex');
+      }
+      if (typeof mapping.id === "object" && mapping.id !== null) {
+        if (typeof mapping.id.toHexString === "function") {
+          return mapping.id.toHexString();
+        }
+        if (typeof mapping.id.toString === "function") {
+          return mapping.id.toString();
+        }
+      }
+      return String(mapping.id);
+    }
+    // Object without id - might be Buffer
+    if (Buffer.isBuffer(mapping)) {
+      return mapping.toString('hex');
+    }
+  }
+  return String(mapping);
+}
+
+// Helper function to find variant mapping with robust ID comparison
+function findVariantMapping(variantMappings: any[], itemVariantId: any, itemMappingId?: any): any {
+  if (!variantMappings || !Array.isArray(variantMappings)) return null;
+  
+  const normalizedVariantId = normalizeVariantId(itemVariantId);
+  const normalizedMappingId = itemMappingId ? normalizeVariantId(itemMappingId) : null;
+  
+  return variantMappings.find((mapping: any) => {
+    // Skip if mapping is just a number (reference)
+    if (typeof mapping === "number") return false;
+    
+    // Normalize mapping ID (handles Buffer objects and ObjectIds)
+    const mappingId = normalizeMappingId(mapping);
+    const normalizedMappingIdValue = normalizeVariantId(mappingId);
+    
+    // Normalize actual variant ID if it exists
+    let normalizedActualVariantId = "";
+    if (mapping.variant?.id !== undefined) {
+      if (Buffer.isBuffer(mapping.variant.id)) {
+        normalizedActualVariantId = mapping.variant.id.toString('hex');
+      } else {
+        normalizedActualVariantId = normalizeVariantId(mapping.variant.id);
+      }
+    }
+
+    // Compare normalized IDs - check both mapping ID and variant ID
+    // Also check if item has a mappingId that matches
+    return (
+      normalizedMappingIdValue === normalizedVariantId ||
+      normalizedActualVariantId === normalizedVariantId ||
+      (normalizedMappingId && normalizedMappingIdValue === normalizedMappingId) ||
+      compareVariantIds(mapping.variant?.id, itemVariantId) ||
+      compareVariantIds(mapping.id, itemVariantId) ||
+      (itemMappingId && compareVariantIds(mapping.id, itemMappingId))
+    );
+  });
+}
+
 async function deductStockFromOrder(cartItems: CartItem[], products: any[]) {
   const payloadClient = await payload();
 
@@ -117,13 +183,13 @@ async function deductStockFromOrder(cartItems: CartItem[], products: any[]) {
     if (!product) continue;
 
     if (item.variant) {
-      // Find the variant mapping for this product and variant
-      const variantMapping = product.variantMappings?.find((mapping: any) => {
-        const mappingVariantId = mapping.variant?.id;
-        const itemVariantId = item.variant?.id;
-        // Use consistent comparison utility (same as validation)
-        return compareVariantIds(mappingVariantId, itemVariantId);
-      });
+      // Find the variant mapping for this product and variant using robust matching
+      // Check both variant.id and variant.mappingId if available
+      const variantMapping = findVariantMapping(
+        product.variantMappings, 
+        item.variant.id,
+        (item.variant as any).mappingId
+      );
 
       if (variantMapping && typeof variantMapping !== "number") {
         // Deduct stock from variant mapping
@@ -169,13 +235,13 @@ async function restoreStockFromOrder(cartItems: CartItem[], products: any[]) {
     if (!product) continue;
 
     if (item.variant) {
-      // Find the variant mapping for this product and variant
-      const variantMapping = product.variantMappings?.find((mapping: any) => {
-        const mappingVariantId = mapping.variant?.id;
-        const itemVariantId = item.variant?.id;
-        // Use consistent comparison utility
-        return compareVariantIds(mappingVariantId, itemVariantId);
-      });
+      // Find the variant mapping for this product and variant using robust matching
+      // Check both variant.id and variant.mappingId if available
+      const variantMapping = findVariantMapping(
+        product.variantMappings, 
+        item.variant.id,
+        (item.variant as any).mappingId
+      );
 
       if (variantMapping && typeof variantMapping !== "number") {
         // Restore stock to variant mapping
@@ -277,13 +343,8 @@ export const POST: APIRoute = async ({ request }) => {
       let variantInfo = null;
 
       if (item.variant) {
-        // Find the variant mapping for this product and variant
-        const variantMapping = product.variantMappings?.find((mapping: any) => {
-          const mappingVariantId = mapping.variant?.id;
-          const itemVariantId = item.variant?.id;
-          // Use consistent comparison utility
-          return compareVariantIds(mappingVariantId, itemVariantId);
-        });
+        // Find the variant mapping for this product and variant using robust matching
+        const variantMapping = findVariantMapping(product.variantMappings, item.variant.id);
 
         if (variantMapping && typeof variantMapping !== "number") {
           // Use centralized pricing logic
