@@ -58,7 +58,7 @@ const SignUpForm = () => {
         setErrorMessages(["Invalid response from the server."]);
       }
     } catch (error) {
-      console.error("Error during sign-up:", error);
+      // console.error("Error during sign-up:", error);
       setErrorMessages(["An error occurred. Please try again."]);
     } finally {
       setLoading(false);

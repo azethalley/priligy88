@@ -82,7 +82,7 @@ const CheckoutContent = () => {
         setError(errorMessage);
       }
     } catch (error) {
-      console.error("Error validating cart items:", error);
+      // console.error("Error validating cart items:", error);
     } finally {
       setIsValidatingCart(false);
     }
@@ -401,15 +401,15 @@ const CheckoutContent = () => {
                             "Some items in your cart are no longer available and have been removed. Please review your cart and try again.",
                           );
                         } catch (fetchError) {
-                          console.error(
-                            "Error fetching valid products:",
-                            fetchError,
-                          );
+                          // console.error(
+                          //   "Error fetching valid products:",
+                          //   fetchError,
+                          // );
                         }
                       }
                     }
                   } catch (error) {
-                    console.error("Form submission error:", error);
+                    // console.error("Form submission error:", error);
                     setError(
                       "Network error. Please check your connection and try again.",
                     );

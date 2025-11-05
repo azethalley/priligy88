@@ -52,14 +52,56 @@ export const POST: APIRoute = async ({ request }) => {
     if (variantId) {
       // Find the variant mapping that corresponds to the variantId
       // The variantId could be either a mapping ID or actual variant ID
+      // Normalize variantMappings first to handle Buffer objects
+      const normalizedVariantId = normalizeVariantId(variantId);
+      
+      // Helper function to normalize mapping ID (handles Buffer objects)
+      const normalizeMappingId = (mapping: any): string => {
+        if (Buffer.isBuffer(mapping)) {
+          return mapping.toString('hex');
+        }
+        if (typeof mapping === "object" && mapping !== null) {
+          if (mapping.id !== undefined) {
+            if (Buffer.isBuffer(mapping.id)) {
+              return mapping.id.toString('hex');
+            }
+            if (typeof mapping.id === "object" && mapping.id !== null) {
+              if (typeof mapping.id.toHexString === "function") {
+                return mapping.id.toHexString();
+              }
+              if (typeof mapping.id.toString === "function") {
+                return mapping.id.toString();
+              }
+            }
+            return String(mapping.id);
+          }
+          // Object without id - might be Buffer
+          if (Buffer.isBuffer(mapping)) {
+            return mapping.toString('hex');
+          }
+        }
+        return String(mapping);
+      };
+      
       const variantMapping = product.variantMappings?.find((mapping: any) => {
-        const mappingId = String(mapping.id);
-        const actualVariantId = String(mapping.variant?.id);
-        const searchId = String(variantId);
+        // Normalize mapping ID (handles Buffer objects)
+        const mappingId = normalizeMappingId(mapping);
+        const normalizedMappingId = normalizeVariantId(mappingId);
+        
+        // Normalize actual variant ID if it exists
+        let normalizedActualVariantId = "";
+        if (mapping.variant?.id !== undefined) {
+          if (Buffer.isBuffer(mapping.variant.id)) {
+            normalizedActualVariantId = mapping.variant.id.toString('hex');
+          } else {
+            normalizedActualVariantId = normalizeVariantId(mapping.variant.id);
+          }
+        }
 
+        // Compare normalized IDs
         return (
-          mappingId === searchId ||
-          actualVariantId === searchId ||
+          normalizedMappingId === normalizedVariantId ||
+          normalizedActualVariantId === normalizedVariantId ||
           compareVariantIds(mapping.variant?.id, variantId) ||
           compareVariantIds(mapping.id, variantId)
         );

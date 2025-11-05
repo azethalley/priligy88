@@ -19,7 +19,7 @@ const DeleteItemButton: React.FC<DeleteItemButtonProps> = ({
     try {
       cartOperations.removeItem(productId, variantId);
     } catch (error) {
-      console.error("Error removing item:", error);
+      // console.error("Error removing item:", error);
     } finally {
       setPending(false);
     }

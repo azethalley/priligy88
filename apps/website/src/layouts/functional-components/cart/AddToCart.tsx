@@ -60,7 +60,7 @@ export function AddToCart({
       const data = await res.json();
       if (!res.ok || !data?.ok) {
         const errorMsg = data?.error || "Validation failed";
-        console.error(errorMsg);
+        // console.error(errorMsg);
         setError(errorMsg);
         return;
       }
@@ -72,7 +72,7 @@ export function AddToCart({
       // Validate the price
       if (!isValidPrice(validatedPrice)) {
         const errorMsg = "Invalid price received from validation";
-        console.error(errorMsg);
+        // console.error(errorMsg);
         setError(errorMsg);
         return;
       }
@@ -112,11 +112,11 @@ export function AddToCart({
       cartOperations.addItem(item as any);
       
       // Show success feedback (optional - could be enhanced with toast notification)
-      console.log("Item added to cart successfully:", item);
+      // console.log("Item added to cart successfully:", item);
     } catch (error) {
       const errorMsg =
         error instanceof Error ? error.message : "Failed to add item to cart";
-      console.error(errorMsg, error);
+      // console.error(errorMsg, error);
       setError(errorMsg);
     } finally {
       setPending(false);
@@ -128,7 +128,7 @@ export function AddToCart({
     ? currentVariant.stock > 0
     : product.published && (product.totalStock || 0) > 0;
   
-  console.log("[TRACE] product.totalStock = ", product.totalStock)
+  // console.log("[TRACE] product.totalStock = ", product.totalStock)
 
   const buttonClasses = `${stylesClass} ${
     pending || !isAvailable ? "cursor-not-allowed" : ""

@@ -27,7 +27,7 @@ export function ProductVariantSelector({
     if (!mounted) return;
 
     if (variants.length > 0 && !selected) {
-      console.log("Setting up variants for first time");
+      // console.log("Setting up variants for first time");
 
       try {
         const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
@@ -37,14 +37,14 @@ export function ProductVariantSelector({
           defaultVariant.name &&
           typeof defaultVariant.price === "number"
         ) {
-          console.log("Setting default variant:", defaultVariant.name);
+          // console.log("Setting default variant:", defaultVariant.name);
           setSelected(defaultVariant);
           onVariantChange(defaultVariant);
         } else {
-          console.warn("Invalid variant data:", defaultVariant);
+          // console.warn("Invalid variant data:", defaultVariant);
         }
       } catch (error) {
-        console.error("Error setting default variant:", error);
+        // console.error("Error setting default variant:", error);
       }
     }
   }, [variants, mounted]); // Removed onVariantChange and selected dependencies
@@ -137,12 +137,12 @@ export function ProductVariantSelector({
                       : "text-gray-900 dark:text-gray-100"
                   } ${!variant.availableForSale ? "opacity-50 cursor-not-allowed" : ""}`}
                   onClick={() => {
-                    console.log(
-                      "Clicked on variant:",
-                      variant.name,
-                      "ID:",
-                      variant.id,
-                    );
+                    // console.log(
+                    //   "Clicked on variant:",
+                    //   variant.name,
+                    //   "ID:",
+                    //   variant.id,
+                    // );
                     if (variant.availableForSale) {
                       handleVariantChange(variant);
                     }

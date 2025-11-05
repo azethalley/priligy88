@@ -24,7 +24,7 @@ const SocialShare: React.FC<{ socialName: string; className: string; pathname: s
         setIsTooltipVisible(false);
       }, 1000);
     } catch (error) {
-      console.error("Failed to copy text: ", error);
+      // console.error("Failed to copy text: ", error);
     }
   };
 

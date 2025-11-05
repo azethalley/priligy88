@@ -25,7 +25,7 @@ const EditItemQuantityButton: React.FC<EditItemQuantityButtonProps> = ({
         type === "plus" ? currentQuantity + 1 : currentQuantity - 1;
       cartOperations.updateQuantity(productId, newQuantity, variantId);
     } catch (error) {
-      console.error("Error updating quantity:", error);
+      // console.error("Error updating quantity:", error);
     } finally {
       setPending(false);
     }
