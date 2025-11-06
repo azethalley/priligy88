@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { payload } from "@/lib/payload";
 import type { Product } from "payload_app";
 import { sendOrderConfirmationEmail } from "@/lib/email";
-import { compareVariantIds, normalizeVariantId, normalizeProductId } from "@/lib/utils/variantId";
+import { compareVariantIds, normalizeVariantId } from "@/lib/utils/variantId";
 import { getVariantPrice, getProductPrice } from "@/lib/utils/pricing";
 
 interface CartItem {
@@ -44,11 +44,10 @@ async function validateAndGetProducts(items: CartItem[]) {
     depth: 2, // Include variant mappings and their variants
   });
 
-  // Normalize product IDs for comparison (handles MongoDB ObjectIds)
-  const normalizedCartIds = productIds.map((id) => normalizeProductId(id));
-  const normalizedFoundIds = products.map((p) => normalizeProductId(p.id));
-  const missingProductIds = normalizedCartIds.filter(
-    (id) => !normalizedFoundIds.includes(id),
+  // Check which products are missing
+  const foundProductIds = products.map((p) => p.id);
+  const missingProductIds = productIds.filter(
+    (id) => !foundProductIds.includes(id),
   );
 
   if (missingProductIds.length > 0) {
@@ -60,19 +59,18 @@ async function validateAndGetProducts(items: CartItem[]) {
   // Check stock availability for each item
   const stockIssues: string[] = [];
   for (const item of items) {
-    const normalizedItemId = normalizeProductId(item.id);
-    const product = products.find((p) => normalizeProductId(p.id) === normalizedItemId);
+    const product = products.find((p) => p.id === item.id);
     if (!product) continue;
 
     // Check variant stock if item has a variant
     if (item.variant) {
-      // Find the variant mapping for this product and variant using robust matching
-      // Check both variant.id and variant.mappingId if available
-      const variantMapping = findVariantMapping(
-        product.variantMappings || [], 
-        item.variant.id,
-        (item.variant as any).mappingId
-      );
+      // Find the variant mapping for this product and variant
+      const variantMapping = product.variantMappings?.find((mapping: any) => {
+        const mappingVariantId = mapping.variant?.id;
+        const itemVariantId = item.variant?.id;
+        // Use consistent comparison utility
+        return compareVariantIds(mappingVariantId, itemVariantId);
+      });
 
       if (!variantMapping || typeof variantMapping === "number") {
         stockIssues.push(
@@ -108,197 +106,21 @@ async function validateAndGetProducts(items: CartItem[]) {
   return products;
 }
 
-// Helper function to normalize mapping ID (handles Buffer objects and ObjectIds)
-// Always returns a clean string, never a Buffer or ObjectId
-function normalizeMappingId(mapping: any): string {
-  if (!mapping) {
-    throw new Error("Cannot normalize undefined or null mapping ID");
-  }
-  
-  // Handle Buffer objects first (check for Buffer.isBuffer before type checks)
-  if (Buffer.isBuffer(mapping)) {
-    return mapping.toString('hex');
-  }
-  
-  // Handle string/number directly
-  if (typeof mapping === "string") {
-    return mapping;
-  }
-  if (typeof mapping === "number") {
-    return String(mapping);
-  }
-  
-  // Handle objects
-  if (typeof mapping === "object" && mapping !== null) {
-    // Check if it has a buffer property (nested Buffer)
-    if (mapping.buffer && Buffer.isBuffer(mapping.buffer)) {
-      return mapping.buffer.toString('hex');
-    }
-    
-    // Check if it's a Buffer-like object with buffer property (serialized Buffer)
-    // This handles cases where Buffer is serialized as { buffer: { '0': 105, '1': 9, ... } }
-    if (mapping.buffer && typeof mapping.buffer === 'object' && !Buffer.isBuffer(mapping.buffer)) {
-      // Check if it has numeric keys (serialized Buffer)
-      const keys = Object.keys(mapping.buffer);
-      const numericKeys = keys.filter(k => /^\d+$/.test(k));
-      if (numericKeys.length > 0) {
-        // It's a serialized Buffer - reconstruct it
-        try {
-          // Extract numeric values in order
-          const values = numericKeys
-            .map(k => parseInt(k, 10))
-            .sort((a, b) => a - b)
-            .map(k => mapping.buffer[String(k)])
-            .filter(v => typeof v === 'number');
-          
-          if (values.length > 0) {
-            const buffer = Buffer.from(values);
-            return buffer.toString('hex');
-          }
-        } catch (e) {
-          // Fall through to other methods
-        }
-      }
-    }
-    
-    // Extract ID from object
-    if (mapping.id !== undefined) {
-      const idValue = mapping.id;
-      
-      // Handle Buffer ID
-      if (Buffer.isBuffer(idValue)) {
-        return idValue.toString('hex');
-      }
-      
-      // Handle nested buffer property in ID
-      if (idValue && typeof idValue === 'object' && idValue.buffer) {
-        if (Buffer.isBuffer(idValue.buffer)) {
-          return idValue.buffer.toString('hex');
-        }
-        // Handle serialized Buffer in idValue.buffer
-        if (typeof idValue.buffer === 'object' && !Buffer.isBuffer(idValue.buffer)) {
-          const keys = Object.keys(idValue.buffer);
-          const numericKeys = keys.filter(k => /^\d+$/.test(k));
-          if (numericKeys.length > 0) {
-            try {
-              const values = numericKeys
-                .map(k => parseInt(k, 10))
-                .sort((a, b) => a - b)
-                .map(k => idValue.buffer[String(k)])
-                .filter(v => typeof v === 'number');
-              
-              if (values.length > 0) {
-                const buffer = Buffer.from(values);
-                return buffer.toString('hex');
-              }
-            } catch (e) {
-              // Fall through
-            }
-          }
-        }
-      }
-      
-      // Handle ObjectId-like objects
-      if (typeof idValue === "object" && idValue !== null) {
-        if (typeof idValue.toHexString === "function") {
-          return idValue.toHexString();
-        }
-        if (typeof idValue.toString === "function") {
-          const str = idValue.toString();
-          // Ensure it's a string, not another Buffer
-          if (typeof str === 'string') {
-            return str;
-          }
-          if (Buffer.isBuffer(str)) {
-            return str.toString('hex');
-          }
-        }
-      }
-      
-      // Handle string/number ID
-      if (typeof idValue === "string") {
-        return idValue;
-      }
-      if (typeof idValue === "number") {
-        return String(idValue);
-      }
-      
-      return String(idValue);
-    }
-    
-    // Handle ObjectId-like objects directly
-    if (typeof mapping.toHexString === "function") {
-      return mapping.toHexString();
-    }
-    if (typeof mapping.toString === "function") {
-      const str = mapping.toString();
-      if (typeof str === 'string') {
-        return str;
-      }
-      if (Buffer.isBuffer(str)) {
-        return str.toString('hex');
-      }
-    }
-  }
-  
-  // Fallback: convert to string
-  return String(mapping);
-}
-
-// Helper function to find variant mapping with robust ID comparison
-function findVariantMapping(variantMappings: any[], itemVariantId: any, itemMappingId?: any): any {
-  if (!variantMappings || !Array.isArray(variantMappings)) return null;
-  
-  const normalizedVariantId = normalizeVariantId(itemVariantId);
-  const normalizedMappingId = itemMappingId ? normalizeVariantId(itemMappingId) : null;
-  
-  return variantMappings.find((mapping: any) => {
-    // Skip if mapping is just a number (reference)
-    if (typeof mapping === "number") return false;
-    
-    // Normalize mapping ID (handles Buffer objects and ObjectIds)
-    const mappingId = normalizeMappingId(mapping);
-    const normalizedMappingIdValue = normalizeVariantId(mappingId);
-    
-    // Normalize actual variant ID if it exists
-    let normalizedActualVariantId = "";
-    if (mapping.variant?.id !== undefined) {
-      if (Buffer.isBuffer(mapping.variant.id)) {
-        normalizedActualVariantId = mapping.variant.id.toString('hex');
-      } else {
-        normalizedActualVariantId = normalizeVariantId(mapping.variant.id);
-      }
-    }
-
-    // Compare normalized IDs - check both mapping ID and variant ID
-    // Also check if item has a mappingId that matches
-    return (
-      normalizedMappingIdValue === normalizedVariantId ||
-      normalizedActualVariantId === normalizedVariantId ||
-      (normalizedMappingId && normalizedMappingIdValue === normalizedMappingId) ||
-      compareVariantIds(mapping.variant?.id, itemVariantId) ||
-      compareVariantIds(mapping.id, itemVariantId) ||
-      (itemMappingId && compareVariantIds(mapping.id, itemMappingId))
-    );
-  });
-}
-
 async function deductStockFromOrder(cartItems: CartItem[], products: any[]) {
   const payloadClient = await payload();
 
   for (const item of cartItems) {
-    const normalizedItemId = normalizeProductId(item.id);
-    const product = products.find((p) => normalizeProductId(p.id) === normalizedItemId);
+    const product = products.find((p) => p.id === item.id);
     if (!product) continue;
 
     if (item.variant) {
-      // Find the variant mapping for this product and variant using robust matching
-      // Check both variant.id and variant.mappingId if available
-      const variantMapping = findVariantMapping(
-        product.variantMappings, 
-        item.variant.id,
-        (item.variant as any).mappingId
-      );
+      // Find the variant mapping for this product and variant
+      const variantMapping = product.variantMappings?.find((mapping: any) => {
+        const mappingVariantId = mapping.variant?.id;
+        const itemVariantId = item.variant?.id;
+        // Use consistent comparison utility (same as validation)
+        return compareVariantIds(mappingVariantId, itemVariantId);
+      });
 
       if (variantMapping && typeof variantMapping !== "number") {
         // Deduct stock from variant mapping
@@ -307,33 +129,10 @@ async function deductStockFromOrder(cartItems: CartItem[], products: any[]) {
           variantMapping.quantity - item.quantity,
         );
 
-        // Normalize mapping ID for database operation (handles ObjectIds and Buffers)
-        let normalizedMappingId: string;
-        try {
-          normalizedMappingId = normalizeMappingId(variantMapping);
-          // Ensure it's definitely a string (double-check)
-          if (typeof normalizedMappingId !== 'string') {
-            console.error('normalizeMappingId returned non-string:', typeof normalizedMappingId, normalizedMappingId);
-            normalizedMappingId = String(normalizedMappingId);
-          }
-        } catch (error) {
-          console.error('Error normalizing mapping ID:', error, variantMapping);
-          throw new Error(`Failed to extract mapping ID: ${error instanceof Error ? error.message : String(error)}`);
-        }
-
-        // Create a clean data object with only the quantity field
-        // Explicitly construct to avoid any relation fields being included
-        const updateData: { quantity: number } = { 
-          quantity: newQuantity,
-        };
-
-        // Only update quantity field - use overrideAccess to bypass access control
-        // This ensures we can update without triggering relation field validations
         await payloadClient.update({
           collection: "product-variant-mappings",
-          id: normalizedMappingId,
-          data: updateData,
-          overrideAccess: true,
+          id: variantMapping.id,
+          data: { quantity: newQuantity },
         });
       }
     } else {
@@ -348,29 +147,10 @@ async function deductStockFromOrder(cartItems: CartItem[], products: any[]) {
           defaultMapping.quantity - item.quantity,
         );
 
-        // Normalize mapping ID for database operation (handles ObjectIds and Buffers)
-        let normalizedMappingId: string;
-        try {
-          normalizedMappingId = normalizeMappingId(defaultMapping);
-          if (typeof normalizedMappingId !== 'string') {
-            normalizedMappingId = String(normalizedMappingId);
-          }
-        } catch (error) {
-          console.error('Error normalizing default mapping ID:', error, defaultMapping);
-          throw new Error(`Failed to extract default mapping ID: ${error instanceof Error ? error.message : String(error)}`);
-        }
-
-        // Create a clean data object with only the quantity field
-        const updateData: { quantity: number } = { 
-          quantity: newQuantity,
-        };
-
-        // Only update quantity field - use overrideAccess to bypass access control
         await payloadClient.update({
           collection: "product-variant-mappings",
-          id: normalizedMappingId,
-          data: updateData,
-          overrideAccess: true,
+          id: defaultMapping.id,
+          data: { quantity: newQuantity },
         });
       }
     }
@@ -381,46 +161,26 @@ async function restoreStockFromOrder(cartItems: CartItem[], products: any[]) {
   const payloadClient = await payload();
 
   for (const item of cartItems) {
-    const normalizedItemId = normalizeProductId(item.id);
-    const product = products.find((p) => normalizeProductId(p.id) === normalizedItemId);
+    const product = products.find((p) => p.id === item.id);
     if (!product) continue;
 
     if (item.variant) {
-      // Find the variant mapping for this product and variant using robust matching
-      // Check both variant.id and variant.mappingId if available
-      const variantMapping = findVariantMapping(
-        product.variantMappings, 
-        item.variant.id,
-        (item.variant as any).mappingId
-      );
+      // Find the variant mapping for this product and variant
+      const variantMapping = product.variantMappings?.find((mapping: any) => {
+        const mappingVariantId = mapping.variant?.id;
+        const itemVariantId = item.variant?.id;
+        // Use consistent comparison utility
+        return compareVariantIds(mappingVariantId, itemVariantId);
+      });
 
       if (variantMapping && typeof variantMapping !== "number") {
         // Restore stock to variant mapping
         const newQuantity = variantMapping.quantity + item.quantity;
 
-        // Normalize mapping ID for database operation (handles ObjectIds and Buffers)
-        let normalizedMappingId: string;
-        try {
-          normalizedMappingId = normalizeMappingId(variantMapping);
-          if (typeof normalizedMappingId !== 'string') {
-            normalizedMappingId = String(normalizedMappingId);
-          }
-        } catch (error) {
-          console.error('Error normalizing variant mapping ID for restore:', error, variantMapping);
-          throw new Error(`Failed to extract mapping ID: ${error instanceof Error ? error.message : String(error)}`);
-        }
-
-        // Create a clean data object with only the quantity field
-        const updateData: { quantity: number } = { 
-          quantity: newQuantity,
-        };
-
-        // Only update quantity field - use overrideAccess to bypass access control
         await payloadClient.update({
           collection: "product-variant-mappings",
-          id: normalizedMappingId,
-          data: updateData,
-          overrideAccess: true,
+          id: variantMapping.id,
+          data: { quantity: newQuantity },
         });
       }
     }
@@ -493,10 +253,8 @@ export const POST: APIRoute = async ({ request }) => {
     try {
       await deductStockFromOrder(cartItems, products);
     } catch (stockError) {
-      console.error("Error in deductStockFromOrder:", stockError);
-      const errorMessage = stockError instanceof Error ? stockError.message : "Failed to process stock deduction";
       return new Response(
-        JSON.stringify({ error: errorMessage }),
+        JSON.stringify({ error: "Failed to process stock deduction" }),
         {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -506,8 +264,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Create formatted cart items with actual prices from database
     const formattedCartItems = cartItems.map((item) => {
-      const normalizedItemId = normalizeProductId(item.id);
-      const product = products.find((p) => normalizeProductId(p.id) === normalizedItemId) as Product;
+      const product = products.find((p) => p.id === item.id) as Product;
       if (!product) throw new Error(`Product ${item.id} not found`);
 
       // Determine price based on variant or product
@@ -515,13 +272,13 @@ export const POST: APIRoute = async ({ request }) => {
       let variantInfo = null;
 
       if (item.variant) {
-        // Find the variant mapping for this product and variant using robust matching
-        // Check both variant.id and variant.mappingId if available
-        const variantMapping = findVariantMapping(
-          product.variantMappings || [], 
-          item.variant.id,
-          (item.variant as any).mappingId
-        );
+        // Find the variant mapping for this product and variant
+        const variantMapping = product.variantMappings?.find((mapping: any) => {
+          const mappingVariantId = mapping.variant?.id;
+          const itemVariantId = item.variant?.id;
+          // Use consistent comparison utility
+          return compareVariantIds(mappingVariantId, itemVariantId);
+        });
 
         if (variantMapping && typeof variantMapping !== "number") {
           // Use centralized pricing logic
