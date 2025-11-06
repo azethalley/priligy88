@@ -109,30 +109,139 @@ async function validateAndGetProducts(items: CartItem[]) {
 }
 
 // Helper function to normalize mapping ID (handles Buffer objects and ObjectIds)
+// Always returns a clean string, never a Buffer or ObjectId
 function normalizeMappingId(mapping: any): string {
+  if (!mapping) {
+    throw new Error("Cannot normalize undefined or null mapping ID");
+  }
+  
+  // Handle Buffer objects first (check for Buffer.isBuffer before type checks)
   if (Buffer.isBuffer(mapping)) {
     return mapping.toString('hex');
   }
+  
+  // Handle string/number directly
+  if (typeof mapping === "string") {
+    return mapping;
+  }
+  if (typeof mapping === "number") {
+    return String(mapping);
+  }
+  
+  // Handle objects
   if (typeof mapping === "object" && mapping !== null) {
-    if (mapping.id !== undefined) {
-      if (Buffer.isBuffer(mapping.id)) {
-        return mapping.id.toString('hex');
-      }
-      if (typeof mapping.id === "object" && mapping.id !== null) {
-        if (typeof mapping.id.toHexString === "function") {
-          return mapping.id.toHexString();
-        }
-        if (typeof mapping.id.toString === "function") {
-          return mapping.id.toString();
-        }
-      }
-      return String(mapping.id);
+    // Check if it has a buffer property (nested Buffer)
+    if (mapping.buffer && Buffer.isBuffer(mapping.buffer)) {
+      return mapping.buffer.toString('hex');
     }
-    // Object without id - might be Buffer
-    if (Buffer.isBuffer(mapping)) {
-      return mapping.toString('hex');
+    
+    // Check if it's a Buffer-like object with buffer property (serialized Buffer)
+    // This handles cases where Buffer is serialized as { buffer: { '0': 105, '1': 9, ... } }
+    if (mapping.buffer && typeof mapping.buffer === 'object' && !Buffer.isBuffer(mapping.buffer)) {
+      // Check if it has numeric keys (serialized Buffer)
+      const keys = Object.keys(mapping.buffer);
+      const numericKeys = keys.filter(k => /^\d+$/.test(k));
+      if (numericKeys.length > 0) {
+        // It's a serialized Buffer - reconstruct it
+        try {
+          // Extract numeric values in order
+          const values = numericKeys
+            .map(k => parseInt(k, 10))
+            .sort((a, b) => a - b)
+            .map(k => mapping.buffer[String(k)])
+            .filter(v => typeof v === 'number');
+          
+          if (values.length > 0) {
+            const buffer = Buffer.from(values);
+            return buffer.toString('hex');
+          }
+        } catch (e) {
+          // Fall through to other methods
+        }
+      }
+    }
+    
+    // Extract ID from object
+    if (mapping.id !== undefined) {
+      const idValue = mapping.id;
+      
+      // Handle Buffer ID
+      if (Buffer.isBuffer(idValue)) {
+        return idValue.toString('hex');
+      }
+      
+      // Handle nested buffer property in ID
+      if (idValue && typeof idValue === 'object' && idValue.buffer) {
+        if (Buffer.isBuffer(idValue.buffer)) {
+          return idValue.buffer.toString('hex');
+        }
+        // Handle serialized Buffer in idValue.buffer
+        if (typeof idValue.buffer === 'object' && !Buffer.isBuffer(idValue.buffer)) {
+          const keys = Object.keys(idValue.buffer);
+          const numericKeys = keys.filter(k => /^\d+$/.test(k));
+          if (numericKeys.length > 0) {
+            try {
+              const values = numericKeys
+                .map(k => parseInt(k, 10))
+                .sort((a, b) => a - b)
+                .map(k => idValue.buffer[String(k)])
+                .filter(v => typeof v === 'number');
+              
+              if (values.length > 0) {
+                const buffer = Buffer.from(values);
+                return buffer.toString('hex');
+              }
+            } catch (e) {
+              // Fall through
+            }
+          }
+        }
+      }
+      
+      // Handle ObjectId-like objects
+      if (typeof idValue === "object" && idValue !== null) {
+        if (typeof idValue.toHexString === "function") {
+          return idValue.toHexString();
+        }
+        if (typeof idValue.toString === "function") {
+          const str = idValue.toString();
+          // Ensure it's a string, not another Buffer
+          if (typeof str === 'string') {
+            return str;
+          }
+          if (Buffer.isBuffer(str)) {
+            return str.toString('hex');
+          }
+        }
+      }
+      
+      // Handle string/number ID
+      if (typeof idValue === "string") {
+        return idValue;
+      }
+      if (typeof idValue === "number") {
+        return String(idValue);
+      }
+      
+      return String(idValue);
+    }
+    
+    // Handle ObjectId-like objects directly
+    if (typeof mapping.toHexString === "function") {
+      return mapping.toHexString();
+    }
+    if (typeof mapping.toString === "function") {
+      const str = mapping.toString();
+      if (typeof str === 'string') {
+        return str;
+      }
+      if (Buffer.isBuffer(str)) {
+        return str.toString('hex');
+      }
     }
   }
+  
+  // Fallback: convert to string
   return String(mapping);
 }
 
@@ -199,7 +308,18 @@ async function deductStockFromOrder(cartItems: CartItem[], products: any[]) {
         );
 
         // Normalize mapping ID for database operation (handles ObjectIds and Buffers)
-        const normalizedMappingId = normalizeMappingId(variantMapping);
+        let normalizedMappingId: string;
+        try {
+          normalizedMappingId = normalizeMappingId(variantMapping);
+          // Ensure it's definitely a string (double-check)
+          if (typeof normalizedMappingId !== 'string') {
+            console.error('normalizeMappingId returned non-string:', typeof normalizedMappingId, normalizedMappingId);
+            normalizedMappingId = String(normalizedMappingId);
+          }
+        } catch (error) {
+          console.error('Error normalizing mapping ID:', error, variantMapping);
+          throw new Error(`Failed to extract mapping ID: ${error instanceof Error ? error.message : String(error)}`);
+        }
 
         // Create a clean data object with only the quantity field
         // Explicitly construct to avoid any relation fields being included
@@ -229,7 +349,16 @@ async function deductStockFromOrder(cartItems: CartItem[], products: any[]) {
         );
 
         // Normalize mapping ID for database operation (handles ObjectIds and Buffers)
-        const normalizedMappingId = normalizeMappingId(defaultMapping);
+        let normalizedMappingId: string;
+        try {
+          normalizedMappingId = normalizeMappingId(defaultMapping);
+          if (typeof normalizedMappingId !== 'string') {
+            normalizedMappingId = String(normalizedMappingId);
+          }
+        } catch (error) {
+          console.error('Error normalizing default mapping ID:', error, defaultMapping);
+          throw new Error(`Failed to extract default mapping ID: ${error instanceof Error ? error.message : String(error)}`);
+        }
 
         // Create a clean data object with only the quantity field
         const updateData: { quantity: number } = { 
@@ -270,7 +399,16 @@ async function restoreStockFromOrder(cartItems: CartItem[], products: any[]) {
         const newQuantity = variantMapping.quantity + item.quantity;
 
         // Normalize mapping ID for database operation (handles ObjectIds and Buffers)
-        const normalizedMappingId = normalizeMappingId(variantMapping);
+        let normalizedMappingId: string;
+        try {
+          normalizedMappingId = normalizeMappingId(variantMapping);
+          if (typeof normalizedMappingId !== 'string') {
+            normalizedMappingId = String(normalizedMappingId);
+          }
+        } catch (error) {
+          console.error('Error normalizing variant mapping ID for restore:', error, variantMapping);
+          throw new Error(`Failed to extract mapping ID: ${error instanceof Error ? error.message : String(error)}`);
+        }
 
         // Create a clean data object with only the quantity field
         const updateData: { quantity: number } = { 
