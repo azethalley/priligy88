@@ -517,8 +517,8 @@ export async function getProductBySlug(slug: string) {
 }
 
 export async function getRelatedProducts(
-  currentProductId: number,
-  categoryId: number,
+  currentProductId: string | number,
+  categoryId: string | number,
 ) {
   const payloadClient = await payload();
   const { docs } = await payloadClient.find({

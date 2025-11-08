@@ -11,6 +11,7 @@
     "isolatedModules": true,
     "incremental": true,
     "allowSyntheticDefaultImports": true,
+    "sourceMap": true,
     "paths": {
       "@/components/*": ["./src/layouts/components/*"],
       "@/functional-components/*": ["./src/layouts/functional-components/*"],

@@ -6,7 +6,7 @@ import type {
   ProcessedVariant,
   CartItemWithVariant,
 } from "@/lib/shopify/types";
-import { normalizeVariantId, normalizeProductId } from "@/lib/utils/variantId";
+import { normalizeVariantId, normalizeId } from "@/lib/utils/variantId";
 import { getProductPrice, isValidPrice } from "@/lib/utils/pricing";
 
 interface AddToCartProps {
@@ -42,7 +42,9 @@ export function AddToCart({
 
     try {
       // Normalize product ID to string (handles MongoDB ObjectIds)
-      const productId = normalizeProductId(product.id);
+      console.log('[Trace] product.id = ', product.id);
+      const productId = normalizeId(product.id);
+      console.log('[Trace] productId = ', productId);
       if (!productId) {
         setError("Invalid product ID");
         return;

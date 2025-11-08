@@ -11,7 +11,7 @@ import config from "@/config/config.json";
 import { generatPayloadImageUrl } from "@/lib/utils";
 import type { Media, Product, ProductCategory, ProductTag } from "payload_app";
 import { ProductVariantManager } from "@/layouts/functional-components/product/ProductVariantManager";
-import { normalizeProductId } from "@/lib/utils/variantId";
+import { normalizeId } from "@/lib/utils/variantId";
 import {
   convertLexicalToHTMLAsync,
   type HTMLConvertersFunctionAsync,
@@ -85,7 +85,7 @@ const productData = product as Product;
 
 // Normalize product ID to string for proper serialization when passing to React components
 // This handles MongoDB ObjectIds which don't serialize properly when passed from Astro to React
-const normalizedProductId = normalizeProductId(productData.id);
+const normalizedProductId = normalizeId(productData.id);
 console.log(`[Astro] Normalizing product ID: ${typeof productData.id} -> ${normalizedProductId} (type: ${typeof normalizedProductId})`);
 
 // Create a serialized version of product with normalized ID for React components

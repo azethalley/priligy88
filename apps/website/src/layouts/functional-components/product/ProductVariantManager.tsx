@@ -7,7 +7,7 @@ import {
   extractVariantId,
   extractMappingId,
   normalizeVariantId,
-  normalizeProductId,
+  normalizeId,
 } from "@/lib/utils/variantId";
 
 interface ProductVariantManagerProps {
@@ -40,7 +40,7 @@ export function ProductVariantManager({
         // console.log(`[ProductVariantManager] Product ID before normalization:`, product.id, `Type:`, typeof product.id);
         
         // Normalize product ID to string (handles MongoDB ObjectIds)
-        const productId = normalizeProductId(product.id);
+        const productId = normalizeId(product.id);
         // console.log(`[ProductVariantManager] Product ID after normalization:`, productId, `Type:`, typeof productId);
         
         if (!productId) {
