@@ -3,7 +3,8 @@ import type { Order, Product } from "payload_app";
 
 // Check each environment variable separately and log the status
 const ZOHO_EMAIL = "admin@100mg.tw";
-const ZOHO_PASSWORD = "2d6bwLQHCucP";
+// const ZOHO_PASSWORD = "2d6bwLQHCucP";
+const ZOHO_PASSWORD = "@account6564";
 const ADMIN_EMAIL = "admin@100mg.tw";
 
 console.log("Email Configuration Status:");

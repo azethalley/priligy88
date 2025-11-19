@@ -6,7 +6,7 @@ cmds = ["pnpm install --frozen-lockfile"]
 
 [phases.build]
 cmds = [
-  "if [ \"$SERVICE_TYPE\" = \"website\" ]; then pnpm run build --filter=website; else pnpm run build --filter=payload_app; fi"
+  "if [ \"$SERVICE_TYPE\" = \"website\" ]; then pnpm run build --filter=website; else pnpm run build --filter=payload_app && cd apps/payload_app && npx payload generate:types && npx payload migrate:create; fi"
 ]
 
 [start]

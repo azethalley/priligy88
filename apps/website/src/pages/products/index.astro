@@ -63,8 +63,8 @@ const maxPriceData = {
 
 // totalPages is now provided by the getProducts function from the database
 
-// Tell Astro this is a static page
-export const prerender = true;
+// Use SSR for dynamic product data
+export const prerender = false;
 ---
 
 <Base title="Products">

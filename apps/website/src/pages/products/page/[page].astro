@@ -16,7 +16,7 @@ import {
 import CallToAction from "@/partials/CallToAction.astro";
 import type { Brand, Product, ProductCategory, ProductTag } from "payload_app";
 
-export const prerender = true;
+export const prerender = false;
 
 // Generate static paths for all product pages
 export async function getStaticPaths() {

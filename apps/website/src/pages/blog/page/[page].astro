@@ -5,7 +5,7 @@ import { payload as _payload } from "@/lib/payload";
 import { generatPayloadImageUrl } from "@/lib/utils";
 import Pagination from "@/layouts/components/Pagination.astro";
 
-export const prerender = true;
+export const prerender = false;
 
 // Generate static paths for all blog pages
 export async function getStaticPaths() {
