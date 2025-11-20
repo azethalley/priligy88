@@ -1,3 +1,4 @@
+import type { Blog } from "payload_app";
 import { payload } from "@/lib/payload";
 
 export const getBlogs = async () => {
@@ -21,4 +22,26 @@ export const getBlog = async (slug: string) => {
     },
   });
   return blog;
+};
+
+export const getAllBlogs = async (): Promise<Blog[]> => {
+  const payloadClient = await payload();
+
+  try {
+    const { docs } = await payloadClient.find({
+      collection: "blogs",
+      where: {
+        published: {
+          equals: true,
+        },
+      },
+      limit: 1000,
+      sort: "-updatedAt",
+    });
+
+    return docs as Blog[];
+  } catch (error) {
+    console.error("Error fetching blogs for sitemap:", error);
+    return [];
+  }
 };

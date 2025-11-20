@@ -2,4 +2,5 @@ User-agent: *
 Allow: /
 
 Disallow: /api/*
+Sitemap: https://priligy88.com/sitemap.xml
 Sitemap: https://priligy88.com/sitemap-index.xml
